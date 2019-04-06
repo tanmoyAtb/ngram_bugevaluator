@@ -1,19 +1,3 @@
-# Copyright 2015 The TensorFlow Authors. All Rights Reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==============================================================================
-"""Basic word2vec example."""
-
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -47,9 +31,6 @@ def word2vec_basic(log_dir):
 
   # Read the data into a list of strings.
   def read_data(train_dir_name):
-    # """Extract the first file enclosed in a zip file as a list of words."""
-    # with zipfile.ZipFile(filename) as f:
-    #   data = tf.compat.as_str(f.read(f.namelist()[0])).split()
     data = list()
     for filename in os.listdir(train_dir_name):
       with open(os.path.join(train_dir_name, filename)) as f:
@@ -62,7 +43,7 @@ def word2vec_basic(log_dir):
   vocabulary = read_data(train_dir_name)
   print('Data size', len(vocabulary))
 
-  # Step 2: Build the dictionary and replace rare words with UNK token.
+  # Step 2: Build the dictionary
 
   def build_dataset(words, n_words):
     """Process raw inputs into a dataset."""
@@ -136,10 +117,6 @@ def word2vec_basic(log_dir):
   num_skips = 2  # How many times to reuse an input to generate a label.
   num_sampled = 64  # Number of negative examples to sample.
 
-  # We pick a random validation set to sample nearest neighbors. Here we limit
-  # the validation samples to the words that have a low numeric ID, which by
-  # construction are also the most frequent. These 3 variables are used only for
-  # displaying model accuracy, they don't affect calculation.
   valid_size = 16  # Random set of words to evaluate similarity on.
   valid_window = 50  # Only pick dev samples in the head of the distribution.
   valid_examples = np.random.choice(valid_window, valid_size, replace=False)
@@ -170,10 +147,7 @@ def word2vec_basic(log_dir):
       with tf.name_scope('biases'):
         nce_biases = tf.Variable(tf.zeros([vocabulary_size]))
 
-    # Compute the average NCE loss for the batch.
-    # tf.nce_loss automatically draws a new sample of the negative labels each
-    # time we evaluate the loss.
-    # Explanation of the meaning of NCE loss:
+
     #   http://mccormickml.com/2016/04/19/word2vec-tutorial-the-skip-gram-model/
     with tf.name_scope('loss'):
       loss = tf.reduce_mean(
@@ -291,8 +265,7 @@ def word2vec_basic(log_dir):
 
 
 def plot(final_embeddings, reverse_dictionary, file_name=None):
-  # pylint: disable=missing-docstring
-  # Function to draw visualization of distance between embeddings.
+
   def plot_with_labels(low_dim_embs, labels, filename):
     assert low_dim_embs.shape[0] >= len(labels), 'More labels than embeddings'
     plt.figure(figsize=(18, 18))  # in inches
@@ -326,8 +299,6 @@ def plot(final_embeddings, reverse_dictionary, file_name=None):
     print('Please install sklearn, matplotlib, and scipy to show embeddings.')
     print(ex)
 
-# All functionality is run after tf.app.run() (b/122547914). This could be split
-# up but the methods are laid sequentially with their usage for clarity.
 def get_prob_dist(data, final_embeddings, reverse_dictionary):
   data_len = len(data)
   prob = 0
@@ -386,9 +357,22 @@ def validate_tests():
       final_dict[key][sorted_key] = result_dict[key][sorted_key]
   return final_dict
 
+def plot_histogram (data):
+  import matplotlib.pyplot as plt
+
+  for key, value in data.items():
+    x = np.arange(len(value))
+    plt.bar(x, height= value.values())
+    plt.xticks(x, value.keys())
+    plt.ylabel(key)
+    plt.show()
+
 def main(unused_argv):
   # Give a folder path as an argument with '--log_dir' to save
   # TensorBoard summaries. Default is a log folder in current directory.
+
+  # data processing and word embedding training
+
   # current_path = os.path.dirname(os.path.realpath(sys.argv[0]))
   #
   # parser = argparse.ArgumentParser()
@@ -400,7 +384,11 @@ def main(unused_argv):
   # flags, unused_flags = parser.parse_known_args()
   # final_embeddings, reverse_dictionary = word2vec_basic(flags.log_dir)
   #
-  #
+
+  # data processing and training ends
+
+  # save data to files and plot word embedding
+
   # np.savetxt("./final_embedding_100001.txt", final_embeddings)
   # with open("./reverse_dictionary.txt", "w") as f:
   #   f.write(json.dumps(reverse_dictionary))
@@ -412,8 +400,17 @@ def main(unused_argv):
   #   saved_reverse_dictionary[int(key)] = value
   #
   # plot(saved_final_embeddings, saved_reverse_dictionary, file_name="tsne_benchmark_100001.png")
+
+  # save data and plotting end
+
+  # produce results on mutated codes
+
   result = validate_tests()
+  plot_histogram((result))
   print(result)
+
+  # result production end
+
 
 if __name__ == '__main__':
   tf.app.run()
