@@ -17,7 +17,7 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
-
+import json
 import argparse
 import collections
 import math
@@ -25,7 +25,7 @@ import os
 import random
 import sys
 import zipfile
-
+import copy
 import numpy as np
 from six.moves import urllib
 from six.moves import xrange  # pylint: disable=redefined-builtin
@@ -43,44 +43,30 @@ def word2vec_basic(log_dir):
   if not os.path.exists(log_dir):
     os.makedirs(log_dir)
 
-  # Step 1: Download the data.
-  url = 'http://mattmahoney.net/dc/'
-
-  # pylint: disable=redefined-outer-name
-  def maybe_download(filename, expected_bytes):
-    """Download a file if not present, and make sure it's the right size."""
-    local_filename = os.path.join(gettempdir(), filename)
-    if not os.path.exists(local_filename):
-      local_filename, _ = urllib.request.urlretrieve(url + filename,
-                                                     local_filename)
-    statinfo = os.stat(local_filename)
-    if statinfo.st_size == expected_bytes:
-      print('Found and verified', filename)
-    else:
-      print(statinfo.st_size)
-      raise Exception('Failed to verify ' + local_filename +
-                      '. Can you get to it with a browser?')
-    return local_filename
-
-  filename = maybe_download('text8.zip', 31344016)
+  train_dir_name = "./data/train"
 
   # Read the data into a list of strings.
-  def read_data(filename):
-    """Extract the first file enclosed in a zip file as a list of words."""
-    with zipfile.ZipFile(filename) as f:
-      data = tf.compat.as_str(f.read(f.namelist()[0])).split()
+  def read_data(train_dir_name):
+    # """Extract the first file enclosed in a zip file as a list of words."""
+    # with zipfile.ZipFile(filename) as f:
+    #   data = tf.compat.as_str(f.read(f.namelist()[0])).split()
+    data = list()
+    for filename in os.listdir(train_dir_name):
+      with open(os.path.join(train_dir_name, filename)) as f:
+        file_data = f.readlines()
+      file_data = [x.strip() for x in file_data if x and x not in ["\n"]]
+      file_data = [x for x in file_data if x]
+      data += file_data
     return data
 
-  vocabulary = read_data(filename)
+  vocabulary = read_data(train_dir_name)
   print('Data size', len(vocabulary))
 
   # Step 2: Build the dictionary and replace rare words with UNK token.
-  vocabulary_size = 50000
 
   def build_dataset(words, n_words):
     """Process raw inputs into a dataset."""
-    count = [['UNK', -1]]
-    count.extend(collections.Counter(words).most_common(n_words - 1))
+    count = collections.Counter(words).most_common(n_words - 1)
     dictionary = {}
     for word, _ in count:
       dictionary[word] = len(dictionary)
@@ -88,12 +74,11 @@ def word2vec_basic(log_dir):
     unk_count = 0
     for word in words:
       index = dictionary.get(word, 0)
-      if index == 0:  # dictionary['UNK']
-        unk_count += 1
       data.append(index)
-    count[0][1] = unk_count
     reversed_dictionary = dict(zip(dictionary.values(), dictionary.keys()))
+    vocabulary_size = len(count)
     return data, count, dictionary, reversed_dictionary
+
 
   # Filling 4 global variables:
   # data - list of codes (integers from 0 to vocabulary_size-1).
@@ -102,9 +87,11 @@ def word2vec_basic(log_dir):
   # dictionary - map of words(strings) to their codes(integers)
   # reverse_dictionary - maps codes(integers) to words(strings)
   data, count, unused_dictionary, reverse_dictionary = build_dataset(
-      vocabulary, vocabulary_size)
+      vocabulary, len(vocabulary))
+  vocabulary_size = len(count)
+
   del vocabulary  # Hint to reduce memory.
-  print('Most common words (+UNK)', count[:5])
+  print('Most common words', count[:5])
   print('Sample data', data[:10], [reverse_dictionary[i] for i in data[:10]])
 
   # Step 3: Function to generate a training batch for the skip-gram model.
@@ -145,7 +132,7 @@ def word2vec_basic(log_dir):
 
   batch_size = 128
   embedding_size = 128  # Dimension of the embedding vector.
-  skip_window = 1  # How many words to consider left and right.
+  skip_window = 4  # How many words to consider left and right.
   num_skips = 2  # How many times to reuse an input to generate a label.
   num_sampled = 64  # Number of negative examples to sample.
 
@@ -154,7 +141,7 @@ def word2vec_basic(log_dir):
   # construction are also the most frequent. These 3 variables are used only for
   # displaying model accuracy, they don't affect calculation.
   valid_size = 16  # Random set of words to evaluate similarity on.
-  valid_window = 100  # Only pick dev samples in the head of the distribution.
+  valid_window = 50  # Only pick dev samples in the head of the distribution.
   valid_examples = np.random.choice(valid_window, valid_size, replace=False)
 
   graph = tf.Graph()
@@ -299,8 +286,11 @@ def word2vec_basic(log_dir):
 
   writer.close()
 
+  return final_embeddings, reverse_dictionary
   # Step 6: Visualize the embeddings.
 
+
+def plot(final_embeddings, reverse_dictionary, file_name=None):
   # pylint: disable=missing-docstring
   # Function to draw visualization of distance between embeddings.
   def plot_with_labels(low_dim_embs, labels, filename):
@@ -326,32 +316,104 @@ def word2vec_basic(log_dir):
 
     tsne = TSNE(
         perplexity=30, n_components=2, init='pca', n_iter=5000, method='exact')
-    plot_only = 500
+    plot_only = 88
     low_dim_embs = tsne.fit_transform(final_embeddings[:plot_only, :])
     labels = [reverse_dictionary[i] for i in xrange(plot_only)]
     plot_with_labels(low_dim_embs, labels, os.path.join(gettempdir(),
-                                                        'tsne.png'))
+                                                        'tsne_benchmark.png' if file_name is None else file_name))
 
   except ImportError as ex:
     print('Please install sklearn, matplotlib, and scipy to show embeddings.')
     print(ex)
 
-
 # All functionality is run after tf.app.run() (b/122547914). This could be split
 # up but the methods are laid sequentially with their usage for clarity.
+def get_prob_dist(data, final_embeddings, reverse_dictionary):
+  data_len = len(data)
+  prob = 0
+  for i in range(data_len-1):
+    line_1 , line_2 = data[i], data[i+1]
+    line_1_index = -1
+    line_2_index = -1
+    for key, val in reverse_dictionary.items():
+      if val == line_1:
+        line_1_index = key
+      if val == line_2:
+        line_2_index = key
+
+    if line_1_index == -1 or line_2_index == -1:
+      continue
+    summation = 0
+    for j in range(len(final_embeddings[0])):
+      sub_prob = final_embeddings[line_1_index][j]*final_embeddings[line_2_index][j]
+      summation += sub_prob
+    prob += summation
+
+  return prob
+
+def validate_tests():
+
+  saved_final_embeddings = np.loadtxt("./final_embedding_100001.txt")
+  saved_reverse_dictionary = {}
+  with open("./reverse_dictionary.txt", "r") as f:
+    temp_reverse_dictionary = json.loads(f.readlines()[0])
+  for key, value in temp_reverse_dictionary.items():
+    saved_reverse_dictionary[int(key)] = value
+
+  test_dir_name = "./data/validation"
+  result_dict = {}
+  for each_dirname in os.listdir(test_dir_name):
+    if str(each_dirname).startswith("."):
+      continue
+    result_dict[each_dirname] = dict()
+
+    for each_filename in os.listdir(os.path.join(test_dir_name, each_dirname)):
+      if str(each_filename).startswith("."):
+        continue
+      with open(os.path.join(test_dir_name, each_dirname, each_filename)) as f:
+        file_data = f.readlines()
+      file_data = [x.strip() for x in file_data if x and x not in ["\n"]]
+      file_data = [x for x in file_data if x]
+      value = get_prob_dist(file_data, saved_final_embeddings, saved_reverse_dictionary)
+      result_dict[each_dirname][each_filename] = value
+  final_dict = collections.OrderedDict()
+  sorted_dirs = sorted(result_dict.keys())
+  for key in sorted_dirs:
+    inner_dict = result_dict[key]
+    sorted_keys = sorted(inner_dict.keys())
+    final_dict[key] = collections.OrderedDict()
+    for sorted_key in sorted_keys:
+      final_dict[key][sorted_key] = result_dict[key][sorted_key]
+  return final_dict
+
 def main(unused_argv):
   # Give a folder path as an argument with '--log_dir' to save
   # TensorBoard summaries. Default is a log folder in current directory.
-  current_path = os.path.dirname(os.path.realpath(sys.argv[0]))
-
-  parser = argparse.ArgumentParser()
-  parser.add_argument(
-      '--log_dir',
-      type=str,
-      default=os.path.join(current_path, 'log'),
-      help='The log directory for TensorBoard summaries.')
-  flags, unused_flags = parser.parse_known_args()
-  word2vec_basic(flags.log_dir)
+  # current_path = os.path.dirname(os.path.realpath(sys.argv[0]))
+  #
+  # parser = argparse.ArgumentParser()
+  # parser.add_argument(
+  #     '--log_dir',
+  #     type=str,
+  #     default=os.path.join(current_path, 'log'),
+  #     help='The log directory for TensorBoard summaries.')
+  # flags, unused_flags = parser.parse_known_args()
+  # final_embeddings, reverse_dictionary = word2vec_basic(flags.log_dir)
+  #
+  #
+  # np.savetxt("./final_embedding_100001.txt", final_embeddings)
+  # with open("./reverse_dictionary.txt", "w") as f:
+  #   f.write(json.dumps(reverse_dictionary))
+  # saved_final_embeddings = np.loadtxt("./final_embedding_100001.txt")
+  # saved_reverse_dictionary = {}
+  # with open("./reverse_dictionary.txt", "r") as f:
+  #   temp_reverse_dictionary = json.loads(f.readlines()[0])
+  # for key, value in temp_reverse_dictionary.items():
+  #   saved_reverse_dictionary[int(key)] = value
+  #
+  # plot(saved_final_embeddings, saved_reverse_dictionary, file_name="tsne_benchmark_100001.png")
+  result = validate_tests()
+  print(result)
 
 if __name__ == '__main__':
   tf.app.run()
