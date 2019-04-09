@@ -17,6 +17,18 @@ import tensorflow as tf
 
 from tensorflow.contrib.tensorboard.plugins import projector
 
+window_size = 1
+iterations = 100001
+plot_points = 60
+final_embeddings_file = "./final_embedding_100001_w1_python.txt"
+reversed_dictionary_file = "./reverse_dictionary_w1_python.txt"
+word_embedding_output_file = "tsne_benchmark_100001_w1_python.png"
+training_directory = "./data_python/train"
+
+validation_directory_insert = "./data_python/validation/insert"
+validation_directory_delete = "./data_python/validation/delete"
+validation_directory_swap = "./data_python/validation/swap"
+
 data_index = 0
 def gettempdir():
   return "."
@@ -27,7 +39,7 @@ def word2vec_basic(log_dir):
   if not os.path.exists(log_dir):
     os.makedirs(log_dir)
 
-  train_dir_name = "./data/train"
+  train_dir_name = training_directory
 
   # Read the data into a list of strings.
   def read_data(train_dir_name):
@@ -113,7 +125,7 @@ def word2vec_basic(log_dir):
 
   batch_size = 128
   embedding_size = 128  # Dimension of the embedding vector.
-  skip_window = 4  # How many words to consider left and right.
+  skip_window = window_size  # How many words to consider left and right.
   num_skips = 2  # How many times to reuse an input to generate a label.
   num_sampled = 64  # Number of negative examples to sample.
 
@@ -185,7 +197,7 @@ def word2vec_basic(log_dir):
     saver = tf.train.Saver()
 
   # Step 5: Begin training.
-  num_steps = 100001
+  num_steps = iterations
 
   with tf.Session(graph=graph) as session:
     # Open a writer to write summaries.
@@ -289,7 +301,7 @@ def plot(final_embeddings, reverse_dictionary, file_name=None):
 
     tsne = TSNE(
         perplexity=30, n_components=2, init='pca', n_iter=5000, method='exact')
-    plot_only = 88
+    plot_only = plot_points
     low_dim_embs = tsne.fit_transform(final_embeddings[:plot_only, :])
     labels = [reverse_dictionary[i] for i in xrange(plot_only)]
     plot_with_labels(low_dim_embs, labels, os.path.join(gettempdir(),
@@ -322,16 +334,16 @@ def get_prob_dist(data, final_embeddings, reverse_dictionary):
 
   return prob
 
-def validate_tests():
+def validate_tests(dir):
 
-  saved_final_embeddings = np.loadtxt("./final_embedding_100001.txt")
+  saved_final_embeddings = np.loadtxt(final_embeddings_file)
   saved_reverse_dictionary = {}
-  with open("./reverse_dictionary.txt", "r") as f:
+  with open(reversed_dictionary_file, "r") as f:
     temp_reverse_dictionary = json.loads(f.readlines()[0])
   for key, value in temp_reverse_dictionary.items():
     saved_reverse_dictionary[int(key)] = value
 
-  test_dir_name = "./data/validation"
+  test_dir_name = dir
   result_dict = {}
   for each_dirname in os.listdir(test_dir_name):
     if str(each_dirname).startswith("."):
@@ -357,15 +369,60 @@ def validate_tests():
       final_dict[key][sorted_key] = result_dict[key][sorted_key]
   return final_dict
 
+
+def roundingVals_toTwoDeci(y):
+  for d in y:
+    for k, v in d.items():
+      v = round(v, 2)
+      d[k] = v
+
 def plot_histogram (data):
   import matplotlib.pyplot as plt
 
+  # for key, value in data.items():
+  #   plt.bar(np.arange(len(value.values())), height= value.values())
+  #   plt.xticks(np.arange(len(value.values())), value.keys())
+  #   plt.ylabel(key)
+  #   plt.show()
+
+  # The data
   for key, value in data.items():
-    x = np.arange(len(value))
-    plt.bar(x, height= value.values())
-    plt.xticks(x, value.keys())
-    plt.ylabel(key)
-    plt.show()
+    for k, v in value.items():
+      v = round(v, 2)
+      value[k] = v
+
+  smallest = data["smallest"]
+  grade = data["grade"]
+  checksum = data["checksum"]
+  median = data["median"]
+  syllables = data["syllables"]
+  bubble = data["bubble"]
+
+  indices = ["", "smallest", "grade", "checksum", "median","syllables", "bubble"]
+
+  smX = np.arange(5)
+  grX = np.arange(5)+10
+  ckX = np.arange(5)+20
+  mdX = np.arange(5)+30
+  syX = np.arange(5)+40
+  bbX = np.arange(5)+50
+
+  width = 0.65
+
+
+  fig = plt.figure()
+  ax = fig.add_subplot(111)
+  ax.bar(smX, smallest.values(), width, color = 'b')
+  ax.bar(grX, grade.values(), width, color = 'b')
+  ax.bar(ckX, checksum.values(), width, color = 'b')
+  ax.bar(mdX, median.values(), width, color = 'b')
+  ax.bar(syX, syllables.values(), width, color = 'b')
+  ax.bar(bbX, bubble.values(), width, color = 'b')
+
+  ax.axes.set_xticklabels(indices)
+  ax.set_xlabel('Prob of Insertion (first bar is refCode)')
+  ax.set_ylabel('Prob')
+  plt.show()
 
 def main(unused_argv):
   # Give a folder path as an argument with '--log_dir' to save
@@ -373,39 +430,42 @@ def main(unused_argv):
 
   # data processing and word embedding training
 
-  # current_path = os.path.dirname(os.path.realpath(sys.argv[0]))
-  #
-  # parser = argparse.ArgumentParser()
-  # parser.add_argument(
-  #     '--log_dir',
-  #     type=str,
-  #     default=os.path.join(current_path, 'log'),
-  #     help='The log directory for TensorBoard summaries.')
-  # flags, unused_flags = parser.parse_known_args()
-  # final_embeddings, reverse_dictionary = word2vec_basic(flags.log_dir)
-  #
+  """
+  current_path = os.path.dirname(os.path.realpath(sys.argv[0]))
+  
+  parser = argparse.ArgumentParser()
+  parser.add_argument(
+      '--log_dir',
+      type=str,
+      default=os.path.join(current_path, 'log'),
+      help='The log directory for TensorBoard summaries.')
+  flags, unused_flags = parser.parse_known_args()
+  final_embeddings, reverse_dictionary = word2vec_basic(flags.log_dir)
+  
 
   # data processing and training ends
 
   # save data to files and plot word embedding
 
-  # np.savetxt("./final_embedding_100001.txt", final_embeddings)
-  # with open("./reverse_dictionary.txt", "w") as f:
-  #   f.write(json.dumps(reverse_dictionary))
-  # saved_final_embeddings = np.loadtxt("./final_embedding_100001.txt")
-  # saved_reverse_dictionary = {}
-  # with open("./reverse_dictionary.txt", "r") as f:
-  #   temp_reverse_dictionary = json.loads(f.readlines()[0])
-  # for key, value in temp_reverse_dictionary.items():
-  #   saved_reverse_dictionary[int(key)] = value
-  #
-  # plot(saved_final_embeddings, saved_reverse_dictionary, file_name="tsne_benchmark_100001.png")
+  np.savetxt(final_embeddings_file, final_embeddings)
+  with open(reversed_dictionary_file, "w") as f:
+    f.write(json.dumps(reverse_dictionary))
+  saved_final_embeddings = np.loadtxt(final_embeddings_file)
+  saved_reverse_dictionary = {}
+  with open(reversed_dictionary_file, "r") as f:
+    temp_reverse_dictionary = json.loads(f.readlines()[0])
+  for key, value in temp_reverse_dictionary.items():
+    saved_reverse_dictionary[int(key)] = value
+  
+  plot(saved_final_embeddings, saved_reverse_dictionary, file_name=word_embedding_output_file)
+
+  """
 
   # save data and plotting end
 
   # produce results on mutated codes
 
-  result = validate_tests()
+  result = validate_tests(validation_directory_swap)
   plot_histogram((result))
   print(result)
 
