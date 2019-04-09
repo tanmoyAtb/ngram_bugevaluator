@@ -17,7 +17,10 @@ The IntroClass Benchmark set of codes was used.
 The model has been trained using correct codes of smallest, grade, syllables, median and checksum.
 The validation set was built by using incremented mutation in the correct codes.
 
-A prob distribution was calculated using word embeddings from training on the validation set.
+A prob distribution was calculated using word embeddings from training on the training set.
 The results show a decrease in prob with increase in mutation.
+
+The results can be found in the results folder.
+A plot of the final embeddings is also given.
 
 The process can be used as an indicator of naturalness of code.
