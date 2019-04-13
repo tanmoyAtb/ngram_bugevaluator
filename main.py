@@ -20,14 +20,14 @@ from tensorflow.contrib.tensorboard.plugins import projector
 window_size = 1
 iterations = 100001
 plot_points = 60
-final_embeddings_file = "./final_embedding_100001_w1_python.txt"
-reversed_dictionary_file = "./reverse_dictionary_w1_python.txt"
-word_embedding_output_file = "tsne_benchmark_100001_w1_python.png"
-training_directory = "./data_python/train"
+final_embeddings_file = "./final_embedding_100001_w1.txt"
+reversed_dictionary_file = "./reverse_dictionary_w1.txt"
+word_embedding_output_file = "tsne_benchmark_100001_w1.png"
+training_directory = "./data/train"
 
-validation_directory_insert = "./data_python/validation/insert"
-validation_directory_delete = "./data_python/validation/delete"
-validation_directory_swap = "./data_python/validation/swap"
+validation_directory_insert = "./data/validation/insert"
+validation_directory_delete = "./data/validation/delete"
+validation_directory_swap = "./data/validation/swap"
 
 data_index = 0
 def gettempdir():
@@ -396,16 +396,17 @@ def plot_histogram (data):
   checksum = data["checksum"]
   median = data["median"]
   syllables = data["syllables"]
-  bubble = data["bubble"]
+  # bubble = data["bubble"]
 
-  indices = ["", "smallest", "grade", "checksum", "median","syllables", "bubble"]
+  indices_python = ["", "smallest", "grade", "checksum", "median","syllables", "bubble"]
+  indices = ["", "smallest", "grade", "checksum", "median","syllables"]
 
   smX = np.arange(5)
   grX = np.arange(5)+10
   ckX = np.arange(5)+20
   mdX = np.arange(5)+30
   syX = np.arange(5)+40
-  bbX = np.arange(5)+50
+  # bbX = np.arange(5)+50
 
   width = 0.65
 
@@ -417,7 +418,7 @@ def plot_histogram (data):
   ax.bar(ckX, checksum.values(), width, color = 'b')
   ax.bar(mdX, median.values(), width, color = 'b')
   ax.bar(syX, syllables.values(), width, color = 'b')
-  ax.bar(bbX, bubble.values(), width, color = 'b')
+  # ax.bar(bbX, bubble.values(), width, color = 'b')
 
   ax.axes.set_xticklabels(indices)
   ax.set_xlabel('Prob of Insertion (first bar is refCode)')
