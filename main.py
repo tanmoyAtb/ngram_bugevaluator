@@ -20,14 +20,14 @@ from tensorflow.contrib.tensorboard.plugins import projector
 window_size = 1
 iterations = 100001
 plot_points = 60
-final_embeddings_file = "./final_embedding_100001_w1.txt"
-reversed_dictionary_file = "./reverse_dictionary_w1.txt"
-word_embedding_output_file = "tsne_benchmark_100001_w1.png"
-training_directory = "./data/train"
+final_embeddings_file = "./final_embedding_100001_w1_python.txt"
+reversed_dictionary_file = "./reverse_dictionary_w1_python.txt"
+word_embedding_output_file = "tsne_benchmark_100001_w1_python.png"
+training_directory = "./data_python/train"
 
-validation_directory_insert = "./data/validation/insert"
-validation_directory_delete = "./data/validation/delete"
-validation_directory_swap = "./data/validation/swap"
+validation_directory_insert = "./data_python/validation/insert"
+validation_directory_delete = "./data_python/validation/delete"
+validation_directory_swap = "./data_python/validation/swap"
 
 data_index = 0
 def gettempdir():
@@ -376,7 +376,7 @@ def roundingVals_toTwoDeci(y):
       v = round(v, 2)
       d[k] = v
 
-def plot_histogram (data):
+def plot_histogram (data, label):
   import matplotlib.pyplot as plt
 
   # for key, value in data.items():
@@ -421,7 +421,7 @@ def plot_histogram (data):
   # ax.bar(bbX, bubble.values(), width, color = 'b')
 
   ax.axes.set_xticklabels(indices)
-  ax.set_xlabel('Prob of Insertion (first bar is refCode)')
+  ax.set_xlabel(label)
   ax.set_ylabel('Prob')
   plt.show()
 
@@ -466,8 +466,8 @@ def main(unused_argv):
 
   # produce results on mutated codes
 
-  result = validate_tests(validation_directory_swap)
-  plot_histogram((result))
+  result = validate_tests(validation_directory_delete)
+  plot_histogram(result, 'Prob of deletion (first bar is refCode)')
   print(result)
 
   # result production end
